@@ -3,15 +3,9 @@ const cartIcon = document.querySelector('#cart-icon')
 const cart = document.querySelector('.cart')
 const closeCart = document.querySelector('#close-cart')
 
-let temporaryCartItems = []
+let gCartContent = []
 
-let cartProductTemplate = {
-	name: 'Product Name',
-	image: 'Product Image',
-	quantity: 0,
-	price: 0,
-	priceText: '0,00.-'
-}
+
 
 // Open Cart
 cartIcon.onclick = () => {
@@ -32,12 +26,11 @@ if (document.readyState == 'loading') {
 
 // Making Function
 async function onLoad() {
+	gCartContent = []
 	const cachedCart = JSON.parse(localStorage.getItem('cart')) || []
 
 	// Remove Items From Cart
 	const removeCartButtons = document.getElementsByClassName('cart-remove')
-
-	console.log(removeCartButtons.length)
 
 	for (let i = 0; i < removeCartButtons.length; i++) {
 		const button = removeCartButtons[i]
@@ -78,17 +71,16 @@ async function onLoad() {
 	if (cachedCart) {
 		for (const product of cachedCart) {
 			const productName = product.name || undefined
-			const productPrice = product.priceText || undefined
+			const productPrice = product.price || undefined
 			const productImage = product.image || undefined
 			const productQuantity = product.quantity || 1
 
 			if (productName && productPrice && productImage && productQuantity) {
-				temporaryCartItems.push(product)
-
 				await createCartItem(String(productName), String(productPrice), String(productImage), String(productQuantity))
 			}
 		}
 	}
+	updatetotal()
 }
 
 async function countOccurrences(arr, item) {
@@ -123,7 +115,7 @@ async function createCartItem(productName, price, productImage, productQuantity)
 		productTitle.className = 'cart-product-title'
 		productTitle.innerText = String(productName)
 		productPrice.className = 'cart-price'
-		productPrice.innerText = String(price)
+		productPrice.innerText = String(price) + ',-'
 		itemQuantity.className = 'cart-quantity'
 		itemQuantity.type = 'number'
 		itemQuantity.min = '1'
@@ -149,37 +141,35 @@ async function createCartItem(productName, price, productImage, productQuantity)
 	
 		cartContent.appendChild(cartBox)
 
-		await updatetotal()
+		let cartProductTemplate = {
+			name: String(productName),
+			image: String(productImage),
+			quantity: parseInt(productQuantity),
+			price: parseFloat(String(price)),
+			priceText: String(price)
+		}
+		gCartContent.push(cartProductTemplate)
 	}
 }
 
 async function addCartItem(productName, productPrice, productImage, productQuantity) {
-	const cartLS = JSON.parse(localStorage.getItem('cart')) || []
 	const cartContent = document.querySelector('.cart-content') || undefined
 	const productText = productName.innerText || undefined
-	const price = productPrice.innerText || undefined
+	const price = productPrice.innerText.replace(',-','') || undefined
 	const image = productImage.src || undefined
 	const quantity = productQuantity || undefined
 
-	if (cartContent && productText && price && image && quantity && !cartLS.find((item) => item.name === String(productText))) {
+	if (cartContent && productText && price && image && quantity && !gCartContent.find((item) => item.name === String(productText))) {
+		// item not yet in cart
 		await createCartItem(String(productText), String(price), String(image), String(quantity))
 
 		if (cart && !cart.classList.contains('active')) {
 			cart.classList.add('active')
 		}
 
-		cartProductTemplate.name = String(productText)
-		cartProductTemplate.image = String(image)
-		cartProductTemplate.quantity = parseInt(quantity)
-		cartProductTemplate.price = parseFloat(String(price).replace(',', '.').replace('.-', ''))
-		cartProductTemplate.priceText = String(price)
-		
-		temporaryCartItems.push(cartProductTemplate)
-		localStorage.setItem('cart', JSON.stringify(temporaryCartItems))
-		
-		console.log(String(productName.innerText))
-	} else if (cartLS.find((item) => item.name === String(productText))) {
-		const itemToUpdate = cartLS.find((item) => item.name === String(productText))
+	} else if (gCartContent.find((item) => item.name === String(productText))) {
+		// item already in cart
+		const itemToUpdate = gCartContent.find((item) => item.name === String(productText))
 
 		console.log('theres a product that already has quantity')
 		
@@ -188,7 +178,7 @@ async function addCartItem(productName, productPrice, productImage, productQuant
 				if (itemToUpdate.name && itemToUpdate.price && itemToUpdate.image && itemToUpdate.quantity) {
 					for (const product of cartContent.children) {
 						if (product.className && String(product.className) === 'cart-box' && product.querySelector('.detail-box').querySelector('.cart-product-title') && String(product.querySelector('.detail-box').querySelector('.cart-product-title').textContent) === String(itemToUpdate.name)) {
-							await removeCartItem(product)
+							await removeCartItem(product.querySelector('.cart-remove'))
 						}
 					}
 
@@ -198,9 +188,8 @@ async function addCartItem(productName, productPrice, productImage, productQuant
 				}
 			}
 		}
-
-		await updatetotal()
 	}
+	await updatetotal()
 }
 
 // Reomve Items From Cart
@@ -209,10 +198,7 @@ async function removeCartItem(element) {
 	const productTitle = element.parentElement.querySelector('.cart-product-title') || undefined
 
 	buttonClicked.parentElement.remove()
-
-	const newCart = temporaryCartItems.filter((item) => String(item?.name) !== String(productTitle))
-
-	localStorage.setItem('cart', JSON.stringify(newCart))
+	gCartContent = gCartContent.filter((item) => String(item?.name) !== String(productTitle.innerHTML))
 
 	await updatetotal()
 }
@@ -222,33 +208,39 @@ async function quantityChanged(input) {
 	if (input.value && isNaN(input.value) || input.value <= 0) {
 		input.value = 1
 	}
-
 	await updatetotal()
 }
 
 // Update Total
 async function updatetotal() {
-	const cartContent = document.getElementsByClassName('cart-content')[0] || undefined
+	const cartContent = document.querySelector('.cart-content')
 	const cartBoxes = cartContent.getElementsByClassName('cart-box') || undefined
 
 	let total = 0
-	
+
 	if (cartContent && cartBoxes) {
 		for (let i = 0; i < cartBoxes.length; i++) {
 			const cartBox = cartBoxes[i] || undefined
+
 			const priceElement = cartBox.getElementsByClassName('cart-price')[0] || undefined
 			const quantityElement = cartBox.getElementsByClassName('cart-quantity')[0] || undefined
-			const price = parseFloat(priceElement?.innerText.replace('.-', '')) || undefined
+			const price = parseFloat(priceElement?.innerHTML) || undefined
 			const quantity = quantityElement?.value || undefined
 	
 			if (cartBox && priceElement && quantityElement && price && quantity) {
 				total = total + (price * quantity)
-	
+			}
 
+			const updatedProductTitleElement = cartBox.querySelector('.cart-product-title') || undefined
+			if(updatedProductTitleElement)
+			{
+				const updatedProduct = gCartContent.find((item) => item.name === String(updatedProductTitleElement.innerHTML))
+				updatedProduct.quantity = quantity
 			}
 		}
-	}				
-	if (document.getElementsByClassName('total-price')) {
-		document.getElementsByClassName('total-price')[0].innerText = `${String(total)} CZK`
 	}
+	if (document.getElementsByClassName('total-price')) {
+		document.getElementsByClassName('total-price')[0].innerHTML = `${String(total)} CZK`
+	}
+	localStorage.setItem('cart', JSON.stringify(gCartContent))
 }
