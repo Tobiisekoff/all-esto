@@ -198,7 +198,7 @@ async function removeCartItem(element) {
 	const productTitle = element.parentElement.querySelector('.cart-product-title') || undefined
 
 	buttonClicked.parentElement.remove()
-	gCartContent = gCartContent.filter((item) => String(item?.name) !== String(productTitle.innerHTML))
+	gCartContent = gCartContent.filter((item) => String(item?.name) !== String(productTitle.innerText))
 
 	await updatetotal()
 }
@@ -234,8 +234,10 @@ async function updatetotal() {
 			const updatedProductTitleElement = cartBox.querySelector('.cart-product-title') || undefined
 			if(updatedProductTitleElement)
 			{
-				const updatedProduct = gCartContent.find((item) => item.name === String(updatedProductTitleElement.innerHTML))
-				updatedProduct.quantity = quantity
+				const updatedProduct = gCartContent.find((item) => item.name === String(updatedProductTitleElement.innerText))
+				if(updatedProduct){
+					updatedProduct.quantity = quantity
+				}
 			}
 		}
 	}
